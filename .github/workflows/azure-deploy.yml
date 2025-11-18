@@ -1,0 +1,64 @@
+name: Deploy to Azure App Service
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  AZURE_WEBAPP_NAME: helpdesk-app-supporthub
+  PHP_VERSION: '8.2'
+  NODE_VERSION: '20'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: ${{ env.PHP_VERSION }}
+        extensions: mbstring, intl, bcmath, pdo_mysql, zip
+        tools: composer:v2
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: Install Composer dependencies
+      run: composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction
+
+    - name: Install NPM dependencies
+      run: npm ci
+
+    - name: Build frontend assets
+      run: npm run build
+
+    - name: Clear Laravel caches
+      run: |
+        php artisan config:clear || true
+        php artisan route:clear || true
+        php artisan view:clear || true
+
+    - name: Create deployment package
+      run: |
+        zip -r deploy.zip . \
+          -x "node_modules/*" \
+          -x ".git/*" \
+          -x ".github/*" \
+          -x "tests/*" \
+          -x ".env*" \
+          -x "*.zip"
+
+    - name: Deploy to Azure Web App
+      uses: azure/webapps-deploy@v3
+      with:
+        app-name: ${{ env.AZURE_WEBAPP_NAME }}
+        publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+        package: deploy.zip
