@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\UserController as AdminUserController;
+use App\Http\Controllers\AiChatController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\NotificationController;
@@ -38,6 +39,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('notifications/{id}/read', [NotificationController::class, 'markAsRead'])->name('notifications.read');
     Route::post('notifications/read-all', [NotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
     Route::delete('notifications/{id}', [NotificationController::class, 'destroy'])->name('notifications.destroy');
+
+    // AI Chat - Available to all authenticated users
+    Route::post('ai/chat', [AiChatController::class, 'chat'])->name('ai.chat');
 
     // Categories - Admin only routes
     Route::middleware(['role:admin'])->group(function () {
