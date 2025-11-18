@@ -59,8 +59,8 @@ return [
             'strict' => true,
             'engine' => null,
             'options' => extension_loaded('pdo_mysql') ? array_filter([
-                PDO::MYSQL_ATTR_SSL_CA => __DIR__.'/../DigiCertGlobalRootG2.crt.pem',
-                PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false,
+                PDO::MYSQL_ATTR_SSL_CA => env('APP_ENV') === 'production' ? __DIR__.'/../DigiCertGlobalRootG2.crt.pem' : null,
+                PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => env('APP_ENV') === 'production' ? false : null,
             ]) : [],
         ],
 
