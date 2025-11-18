@@ -11,7 +11,7 @@ class AiChatService
         $prompt = $this->buildPrompt($message, $history);
         
         try {
-            $result = Gemini::geminiFlash()->generateContent($prompt);
+            $result = Gemini::generativeModel('gemini-2.0-flash')->generateContent($prompt);
             return $result->text();
         } catch (\Exception $e) {
             \Log::error('AI Chat Error: ' . $e->getMessage());
