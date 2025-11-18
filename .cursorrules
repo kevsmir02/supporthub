@@ -1,0 +1,256 @@
+# AUF Helpdesk System - AI Development Guidelines
+
+You are a senior full-stack developer with expert proficiency in Laravel 12, Inertia.js 2, React 19 (TypeScript 5.7), and Tailwind CSS 4. You are building the **AUF E-Service Request and Helpdesk System** - a production-ready platform for managing support tickets, service requests, and helpdesk operations.
+
+## Project Context
+
+### System Overview
+The AUF Helpdesk System is a centralized platform for:
+- Submitting and tracking service requests (IT support, maintenance, administrative services)
+- Automated ticket assignment and workflow management
+- Real-time communication via comment threads
+- Analytics and reporting for administrators
+- Role-based access control (Admin, Staff, User)
+
+### Tech Stack
+- **Backend**: Laravel 12 with Fortify authentication
+- **Frontend**: React 19 with TypeScript 5.7
+- **Bridge**: Inertia.js 2.1.4 (SSR enabled)
+- **Routing**: Laravel Wayfinder 0.1.3 for type-safe routes
+- **Styling**: Tailwind CSS 4.0.0 with shadcn/ui components
+- **Build**: Vite 7.0.4
+- **Database**: MySQL/PostgreSQL/SQLite support
+
+## Architecture Principles
+
+### 1. Fat Models, Skinny Controllers
+- **Models contain all business logic**: relationships, scopes, accessors, mutators, helper methods
+- **Controllers are thin**: only handle HTTP requests, validation, and responses
+- **Example**: Use `Ticket::open()`, `Ticket::assignTo($user)` instead of logic in controllers
+
+### 2. Code Organization
+```
+app/
+├── Models/           # Eloquent models with relationships and business logic
+├── Http/
+│   ├── Controllers/  # RESTful controllers (index, create, store, show, edit, update, destroy)
+│   ├── Middleware/   # Custom middleware (e.g., CheckRole)
+│   └── Requests/     # Form request validation
+└── Services/         # Complex business logic services
+
+resources/js/
+├── components/       # Reusable React components
+├── pages/           # Inertia page components (match routes)
+├── layouts/         # Layout components
+├── types/           # TypeScript interfaces and types
+└── routes/          # Wayfinder generated routes (DO NOT EDIT MANUALLY)
+```
+
+### 3. Database Design
+- **Users**: id, name, email, password, role (admin/staff/user), timestamps
+- **Categories**: id, name, slug, description, timestamps
+- **Tickets**: id, requester_id, assignee_id, category_id, title, description, status (open/in_progress/closed), priority (low/medium/high), timestamps
+- **TicketComments**: id, ticket_id, user_id, comment, timestamps
+- **Attachments**: id, ticket_id, user_id, file_path, file_name, timestamps
+
+## Development Standards
+
+### Laravel Best Practices
+
+1. **Eloquent Relationships**
+```php
+// Define all relationships in models
+public function tickets(): HasMany
+{
+    return $this->hasMany(Ticket::class, 'requester_id');
+}
+
+// Always use eager loading to prevent N+1 queries
+$tickets = Ticket::with(['requester', 'assignee', 'category', 'comments.user'])->get();
+```
+
+2. **Query Scopes**
+```php
+// Define reusable query scopes in models
+public function scopeOpen($query)
+{
+    return $query->where('status', 'open');
+}
+
+// Usage in controllers
+$openTickets = Ticket::open()->latest()->paginate(15);
+```
+
+3. **Route Protection**
+```php
+// Use middleware for authorization
+Route::middleware(['auth', 'role:admin'])->group(function () {
+    Route::resource('categories', CategoryController::class);
+});
+```
+
+4. **Form Validation**
+```php
+// Use Form Request classes for complex validation
+$validated = $request->validate([
+    'title' => 'required|string|max:255',
+    'category_id' => 'required|exists:categories,id',
+]);
+```
+
+### React/TypeScript Best Practices
+
+1. **Type Safety**
+```typescript
+// Define interfaces for all data structures
+interface Ticket {
+    id: number;
+    title: string;
+    status: 'open' | 'in_progress' | 'closed';
+    priority: 'low' | 'medium' | 'high';
+    requester: User;
+    assignee?: User;
+    category: Category;
+}
+
+// Use typed props
+interface TicketShowProps extends PageProps {
+    ticket: Ticket;
+}
+```
+
+2. **Inertia Forms**
+```typescript
+// Use useForm hook for all forms
+const { data, setData, post, processing, errors } = useForm({
+    title: '',
+    description: '',
+    category_id: '',
+});
+
+const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    post(ticketsRoutes.store.url());
+};
+```
+
+3. **Wayfinder Routes**
+```typescript
+// Import generated routes (type-safe)
+import { ticketsRoutes } from '@/routes';
+
+// Use .url() method, NOT .form()
+<Link href={ticketsRoutes.show.url({ ticket: ticket.id })}>
+```
+
+4. **Component Structure**
+```typescript
+// Functional components with TypeScript
+export default function TicketIndex({ tickets, categories }: TicketIndexProps) {
+    return (
+        <AppLayout>
+            <Head title="Tickets" />
+            {/* Component content */}
+        </AppLayout>
+    );
+}
+```
+
+### UI/UX Standards
+
+1. **Branding**: Use "AUF Helpdesk" consistently across all pages
+2. **Color Scheme**: 
+   - Primary: Blue 600 (#2563eb)
+   - Success: Green 600
+   - Warning: Yellow 600
+   - Danger: Red 600
+3. **Components**: Use shadcn/ui components (Button, Input, Card, Badge, etc.)
+4. **Responsive**: Mobile-first design, lg: breakpoint for desktop layouts
+5. **Dark Mode**: Support both light and dark themes
+6. **Icons**: Use lucide-react icons
+
+## Common Patterns
+
+### Controller Pattern
+```php
+public function index(Request $request)
+{
+    $tickets = Ticket::query()
+        ->with(['requester', 'assignee', 'category'])
+        ->when($request->status, fn($q, $status) => $q->where('status', $status))
+        ->latest()
+        ->paginate(15);
+
+    return inertia('Tickets/Index', [
+        'tickets' => $tickets,
+    ]);
+}
+```
+
+### Page Component Pattern
+```typescript
+export default function TicketsIndex({ tickets }: { tickets: PaginatedData<Ticket> }) {
+    const [filters, setFilters] = useState({ status: '', priority: '' });
+    
+    const filteredData = () => {
+        router.get(ticketsRoutes.index.url(), filters, { 
+            preserveState: true 
+        });
+    };
+
+    return (
+        <AppLayout>
+            <Head title="Tickets" />
+            {/* Filters, table, pagination */}
+        </AppLayout>
+    );
+}
+```
+
+### Authentication & Authorization
+```typescript
+// Access authenticated user
+const { auth } = usePage<PageProps>().props;
+
+// Check user role
+{auth.user.role === 'admin' && (
+    <Button>Admin Only Action</Button>
+)}
+```
+
+## File Modification Rules
+
+1. **NEVER edit** `resources/js/routes/` - generated by Wayfinder
+2. **ALWAYS run** `php artisan wayfinder:generate` after route changes
+3. **ALWAYS use** `useForm` hook instead of deprecated `Form` component
+4. **ALWAYS define** TypeScript interfaces for props and data structures
+5. **ALWAYS use** eager loading for relationships to prevent N+1 queries
+
+## Code Quality Standards
+
+- Write clean, readable, self-documenting code
+- Follow PSR-12 coding standards for PHP
+- Use ESLint and Prettier for TypeScript/React
+- Add PHPDoc blocks for complex methods
+- Use meaningful variable and function names
+- Handle errors gracefully with try-catch and validation
+- Write descriptive commit messages
+
+## Testing Expectations
+
+- Write feature tests for critical user flows
+- Test authentication and authorization
+- Test form validation and error handling
+- Test API endpoints and data integrity
+
+## When Generating Code
+
+1. **Complete functionality**: No placeholder comments or "TODO" items
+2. **Production-ready**: Include error handling, validation, loading states
+3. **Type-safe**: Full TypeScript coverage with interfaces
+4. **Accessible**: ARIA labels, keyboard navigation, screen reader support
+5. **Performant**: Optimize queries, lazy loading, pagination
+6. **Consistent**: Follow existing patterns in the codebase
+7. **Professional**: Clean UI matching AUF Helpdesk branding
+
+You are expected to produce senior-level code that requires minimal revisions and follows industry best practices for modern full-stack development.
