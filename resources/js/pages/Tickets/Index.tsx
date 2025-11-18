@@ -1,4 +1,4 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
 import { PageProps } from '@/types';
 import { PaginatedData, Ticket } from '@/types/models';
@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/select';
 import * as ticketsRoutes from '@/routes/tickets';
 import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 
 interface TicketsIndexProps extends PageProps {
     tickets: PaginatedData<Ticket>;
@@ -30,6 +31,17 @@ export default function Index({ auth, tickets, filters }: TicketsIndexProps) {
     const [search, setSearch] = useState(filters.search || '');
     const [status, setStatus] = useState(filters.status || 'all');
     const [priority, setPriority] = useState(filters.priority || 'all');
+    const { flash } = usePage<PageProps>().props;
+
+    // Show toast notification for flash messages
+    useEffect(() => {
+        if (flash?.success) {
+            toast.success(flash.success);
+        }
+        if (flash?.error) {
+            toast.error(flash.error);
+        }
+    }, [flash]);
 
     // Auto-apply filters when they change
     useEffect(() => {

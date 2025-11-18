@@ -65,8 +65,13 @@ class TicketCommentController extends Controller
             ));
         }
 
+        // Role-specific toast message
+        $toastMessage = auth()->user()->isUser()
+            ? 'Your comment has been posted'
+            : 'Comment added successfully';
+
         return redirect()->back()
-            ->with('success', 'Comment added successfully.');
+            ->with('success', $toastMessage);
     }
 
     /**

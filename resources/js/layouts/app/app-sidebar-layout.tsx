@@ -4,6 +4,7 @@ import { AppSidebar } from '@/components/app-sidebar';
 import { AppSidebarHeader } from '@/components/app-sidebar-header';
 import { AiChatWidget } from '@/components/ai-chat-widget';
 import { SidebarProvider } from '@/components/ui/sidebar';
+import { Toaster } from '@/components/ui/sonner';
 import { type BreadcrumbItem } from '@/types';
 import { type PropsWithChildren } from 'react';
 
@@ -21,6 +22,7 @@ export default function AppSidebarLayout({
                 </AppContent>
                 <AiChatWidget />
             </AppShell>
+            <Toaster position="top-right" duration={4000} />
         </SidebarProvider>
     );
 }

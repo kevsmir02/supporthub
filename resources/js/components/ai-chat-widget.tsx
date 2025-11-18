@@ -52,18 +52,20 @@ export function AiChatWidget() {
 
             const data = await response.json();
 
-            if (data.success) {
+            if (data.success && data.response) {
                 setMessages([...newMessages, { role: 'assistant', content: data.response }]);
             } else {
+                const errorMessage = data.error || 'I encountered an error. Please try again or create a support ticket.';
                 setMessages([
                     ...newMessages,
-                    { role: 'assistant', content: 'Sorry, I encountered an error. Please try again.' },
+                    { role: 'assistant', content: errorMessage },
                 ]);
             }
         } catch (error) {
+            console.error('AI Chat error:', error);
             setMessages([
                 ...newMessages,
-                { role: 'assistant', content: 'Sorry, I could not connect. Please try again later.' },
+                { role: 'assistant', content: 'Connection error. Please check your internet connection and try again, or create a support ticket for assistance.' },
             ]);
         } finally {
             setIsLoading(false);

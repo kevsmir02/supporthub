@@ -33,7 +33,8 @@ return [
     |
     | The timeout may be used to specify the maximum number of seconds to wait
     | for a response. By default, the client will time out after 30 seconds.
+    | Increased to 60 seconds for better reliability.
     */
 
-    'request_timeout' => env('GEMINI_REQUEST_TIMEOUT', 30),
+    'request_timeout' => env('GEMINI_REQUEST_TIMEOUT', 60),
 ];

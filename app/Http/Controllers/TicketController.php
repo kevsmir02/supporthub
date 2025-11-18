@@ -96,16 +96,19 @@ class TicketController extends Controller
             'status' => 'open',
         ]);
 
-        // Notify all staff and admins about new ticket
-        $staffAndAdmins = User::whereIn('role', ['admin', 'staff'])->get();
-        Notification::send($staffAndAdmins, new TicketNotification(
+        // Notify only admins about new ticket (not staff, since it's not assigned yet)
+        $admins = User::where('role', 'admin')->get();
+        Notification::send($admins, new TicketNotification(
             'ticket_created',
             $ticket,
             auth()->user()
         ));
 
+        // User-specific toast message
+        $toastMessage = 'Your request has been submitted successfully';
+
         return redirect()->route('tickets.show', $ticket)
-            ->with('success', 'Ticket created successfully.');
+            ->with('success', $toastMessage);
     }
 
     /**
@@ -149,9 +152,14 @@ class TicketController extends Controller
      */
     public function edit(Ticket $ticket): Response
     {
-        // Authorization check
-        if (auth()->user()->isUser() && $ticket->requester_id !== auth()->id()) {
-            abort(403, 'Unauthorized to edit this ticket.');
+        // Only the requester can edit the ticket data
+        if ($ticket->requester_id !== auth()->id()) {
+            abort(403, 'Only the ticket creator can edit ticket details.');
+        }
+
+        // Users can only edit if ticket is still open (not assigned or in progress)
+        if ($ticket->status !== 'open' || $ticket->assignee_id !== null) {
+            abort(403, 'Cannot edit ticket once it has been assigned or status changed.');
         }
 
         $ticket->load(['category']);
@@ -166,9 +174,30 @@ class TicketController extends Controller
      */
     public function update(Request $request, Ticket $ticket): RedirectResponse
     {
-        // Authorization check
-        if (auth()->user()->isUser() && $ticket->requester_id !== auth()->id()) {
-            abort(403, 'Unauthorized to update this ticket.');
+        $currentUser = auth()->user();
+
+        // Determine what kind of update this is
+        $isStatusOrAssignmentUpdate = $request->has('status') || $request->has('assignee_id');
+        $isTicketDataUpdate = $request->has('title') || $request->has('description') || $request->has('category_id') || $request->has('priority');
+
+        // Admin and Staff can ONLY update status/assignment, NOT ticket data
+        if (($currentUser->isAdmin() || $currentUser->isStaff()) && $isTicketDataUpdate) {
+            abort(403, 'Admin and Staff cannot edit ticket details. Only status and assignment can be changed.');
+        }
+
+        // Users can ONLY update ticket data, NOT status/assignment (except via Edit form)
+        // Users can only edit their own tickets
+        if ($currentUser->isUser()) {
+            if ($ticket->requester_id !== $currentUser->id) {
+                abort(403, 'You can only edit your own tickets.');
+            }
+
+            // If updating ticket data, check if ticket is still open and unassigned
+            if ($isTicketDataUpdate) {
+                if ($ticket->status !== 'open' || $ticket->assignee_id !== null) {
+                    abort(403, 'Cannot edit ticket once it has been assigned or status changed.');
+                }
+            }
         }
 
         $validated = $request->validate([
@@ -180,17 +209,15 @@ class TicketController extends Controller
             'assignee_id' => 'nullable|exists:users,id',
         ]);
 
-        // Regular users can't change assignee or status to closed
-        if (auth()->user()->isUser()) {
+        // Users can't change assignee or status (only via status update form on Show page)
+        if ($currentUser->isUser()) {
             unset($validated['assignee_id']);
-            if (isset($validated['status']) && $validated['status'] === 'closed') {
-                unset($validated['status']);
-            }
+            unset($validated['status']);
         }
 
         $oldStatus = $ticket->status;
         $oldAssigneeId = $ticket->assignee_id;
-        
+
         $ticket->update($validated);
 
         // Notify requester if status changed
@@ -212,8 +239,32 @@ class TicketController extends Controller
             ));
         }
 
+        // Generate role-specific and context-aware toast message
+        $toastMessage = 'Ticket updated successfully';
+        $currentUser = auth()->user();
+
+        if (isset($validated['status']) && $oldStatus !== $validated['status']) {
+            // Status changed - message depends on role and action
+            if ($currentUser->isAdmin() || $currentUser->isStaff()) {
+                $toastMessage = match($validated['status']) {
+                    'open' => 'Ticket has been reopened',
+                    'in_progress' => 'Ticket is now being worked on',
+                    'closed' => 'Ticket has been resolved and closed',
+                    default => 'Ticket status updated',
+                };
+            }
+        } elseif (isset($validated['assignee_id']) && $oldAssigneeId !== $validated['assignee_id']) {
+            // Assignee changed - only admins can do this
+            if ($currentUser->isAdmin()) {
+                $assigneeName = User::find($validated['assignee_id'])?->name ?? 'Unassigned';
+                $toastMessage = $validated['assignee_id']
+                    ? "Ticket assigned to {$assigneeName}"
+                    : 'Ticket unassigned';
+            }
+        }
+
         return redirect()->route('tickets.show', $ticket)
-            ->with('success', 'Ticket updated successfully.');
+            ->with('success', $toastMessage);
     }
 
     /**
@@ -228,7 +279,12 @@ class TicketController extends Controller
 
         $ticket->delete();
 
+        // Role-specific toast message
+        $toastMessage = auth()->user()->isAdmin()
+            ? 'Ticket deleted successfully'
+            : 'Your request has been deleted';
+
         return redirect()->route('tickets.index')
-            ->with('success', 'Ticket deleted successfully.');
+            ->with('success', $toastMessage);
     }
 }

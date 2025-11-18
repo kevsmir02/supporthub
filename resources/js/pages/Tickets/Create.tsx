@@ -1,4 +1,4 @@
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
 import { PageProps } from '@/types';
 import { Category } from '@/types/models';
@@ -16,18 +16,30 @@ import {
 } from '@/components/ui/select';
 import * as ticketsRoutes from '@/routes/tickets';
 import { FormEventHandler, useEffect, useState } from 'react';
+import { toast } from 'sonner';
 
 interface TicketsCreateProps extends PageProps {
     categories?: Category[];
 }
 
 export default function Create({ auth, categories = [] }: TicketsCreateProps) {
+    const { flash } = usePage<PageProps>().props;
     const { data, setData, post, processing, errors } = useForm({
         category_id: '',
         title: '',
         description: '',
         priority: 'medium' as 'low' | 'medium' | 'high',
     });
+
+    // Show toast notification for flash messages
+    useEffect(() => {
+        if (flash?.success) {
+            toast.success(flash.success);
+        }
+        if (flash?.error) {
+            toast.error(flash.error);
+        }
+    }, [flash]);
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();

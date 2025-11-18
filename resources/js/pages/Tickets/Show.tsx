@@ -1,4 +1,4 @@
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
 import { PageProps } from '@/types';
 import { Ticket, TicketComment, User } from '@/types/models';
@@ -16,7 +16,8 @@ import {
 } from '@/components/ui/select';
 import * as ticketsRoutes from '@/routes/tickets';
 import * as commentsRoutes from '@/routes/comments';
-import { FormEventHandler } from 'react';
+import { FormEventHandler, useEffect } from 'react';
+import { toast } from 'sonner';
 
 interface TicketShowProps extends PageProps {
     ticket: Ticket;
@@ -27,6 +28,17 @@ export default function Show({ auth, ticket, staffUsers }: TicketShowProps) {
     const isAdminOrStaff = auth.user.role === 'admin' || auth.user.role === 'staff';
     const isAdmin = auth.user.role === 'admin';
     const isOwner = ticket.requester_id === auth.user.id;
+    const { flash } = usePage<PageProps>().props;
+
+    // Show toast notification for flash messages
+    useEffect(() => {
+        if (flash?.success) {
+            toast.success(flash.success);
+        }
+        if (flash?.error) {
+            toast.error(flash.error);
+        }
+    }, [flash]);
 
     const { data, setData, post, processing, errors, reset } = useForm({
         ticket_id: ticket.id,
@@ -95,7 +107,8 @@ export default function Show({ auth, ticket, staffUsers }: TicketShowProps) {
                                 Ticket #{ticket.id}: {ticket.title}
                             </h2>
                         </div>
-                        {(isOwner || isAdminOrStaff) && (
+                        {/* Only show Edit button for requester if ticket is open and unassigned */}
+                        {isOwner && ticket.status === 'open' && !ticket.assignee_id && (
                             <Link href={ticketsRoutes.edit.url({ ticket: ticket.id })}>
                                 <Button variant="outline">Edit Ticket</Button>
                             </Link>
